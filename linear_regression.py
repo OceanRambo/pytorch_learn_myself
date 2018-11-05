@@ -27,6 +27,7 @@ y_train = np.array([[1.7], [2.76], [2.09], [3.19], [1.694], [1.573],
 
 # plt.plot(x_train, y_train, 'ok')
 # plt.show()
+# y = wx + b
 
 x_train = torch.from_numpy(x_train)
 y_train = torch.from_numpy(y_train)
@@ -70,18 +71,25 @@ for epoch in range(num_epochs):
         print('Epoch[{}/{}], loss: {:.6f}'.format(epoch+1, num_epochs, loss.data[0]))
 
 
+print("==> Learned function: y = {:.2f} + {:.2f}*x".format(model.linear.bias[0], model.linear.weight[0][0]))
+
+
 model.eval()
 if flag:
     x_train = x_train.cuda()
     predict = model(x_train)
     predict = predict.cpu().data.numpy()
-    plt.plot(x_train.cpu().numpy(), y_train.cpu().numpy(), 'ro', label='Original data')
-    plt.plot(x_train.cpu().numpy(), predict, label='Fitting Line')
+    plt.plot(x_train.cpu().numpy(), y_train.cpu().numpy(), 'ro')
+    plt.plot(x_train.cpu().numpy(), predict)
+    plt.legend(['Actual', 'Learned'])
     plt.show()
 
 else:
     predict = model(x_train)
     predict = predict.data.numpy()
-    plt.plot(x_train.numpy(), y_train.numpy(), 'ro', label='Original data')
-    plt.plot(x_train.numpy(), predict, label='Fitting Line')
+    plt.plot(x_train.numpy(), y_train.numpy(), 'ro')
+    plt.plot(x_train.numpy(), predict)
+    plt.legend(['Actual', 'Learned'])
     plt.show()
+
+# torch.save(model.state_dict(), 'model.pkl')

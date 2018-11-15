@@ -1,5 +1,7 @@
-# **********多层全连接神经网络实现 MNIST 手写数字分类*******
+"""
+**********卷积神经网络实现 MNIST 手写数字分类*******
 
+"""
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -8,27 +10,39 @@ from torchvision import transforms, datasets
 import time
 
 
-# 定义三层全连接网络
-# 加快收敛速度的方法：批标准化，批标准化一般放在全连接层的后面、非线性层(激活函数)的前面
-# 添加激活函数增加网络的非线性
-class NetWork(nn.Module):
-    def __init__(self, in_dim, hidden_1, hidden_2, out_dim):
-        super(NetWork, self).__init__()
-        self.layer1 = nn.Sequential(nn.Linear(in_dim, hidden_1),
-                                    nn.BatchNorm1d(hidden_1),
-                                    nn.ReLU(True))
+class Cnn(nn.Module):
+    def __init__(self):
+        super(Cnn, self).__init__()
+        self.layer1 = nn.Sequential(nn.Conv2d(1, 16, 3),
+                                    nn.BatchNorm2d(16),
+                                    nn.ReLU(inplace=True))
 
-        self.layer2 = nn.Sequential(nn.Linear(hidden_1, hidden_2),
-                                    nn.BatchNorm1d(hidden_2),
-                                    nn.ReLU(True))
+        self.layer2 = nn.Sequential(nn.Conv2d(16, 32, 3),
+                                    nn.BatchNorm2d(32),
+                                    nn.ReLU(inplace=True),
+                                    nn.MaxPool2d(2, 2))
 
-        # 最后一层输出层不能添加激活函数，因为输出的结果表示的是实际的得分
-        self.layer3 = nn.Sequential(nn.Linear(hidden_2, out_dim))
+        self.layer3 = nn.Sequential(nn.Conv2d(32, 64, 3),
+                                    nn.BatchNorm2d(64),
+                                    nn.ReLU(inplace=True))
 
-    def forward(self, x):
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
+        self.layer4 = nn.Sequential(nn.Conv2d(64, 128, 3),
+                                    nn.BatchNorm2d(128),
+                                    nn.ReLU(inplace=True),
+                                    nn.MaxPool2d(2, 2))
+        self.fc = nn.Sequential(nn.Linear(128*4*4, 1024),
+                                nn.ReLU(inplace=True),
+                                nn.Linear(1024, 128),
+                                nn.ReLU(inplace=True),
+                                nn.Linear(128, 10))
+
+    def forward(self, x):               # batch_size*1*28*28
+        x = self.layer1(x)              # batch_size*16*26*26
+        x = self.layer2(x)              # batch_size*32*12*12
+        x = self.layer3(x)              # batch_size*64*10*10
+        x = self.layer4(x)              # batch_size*128*4*4
+        x = x.view(x.size(0), -1)       # batch_size*(128*4*4)
+        x = self.fc(x)                  # batch_size*10
         return x
 
 
@@ -48,8 +62,8 @@ data_tf = transforms.Compose([transforms.ToTensor(),
 
 
 # 读取数据集： 如果data/mnist文件夹下存在该数据集，直接读取， 不存在则先下载后读取
-train_set = datasets.MNIST(root='./data/mnist/', train=True, transform=data_tf, download=True)
-test_set = datasets.MNIST(root='./data/mnist/', train=False, transform=data_tf, download=True)
+train_set = datasets.MNIST(root='./data/mnist', train=True, transform=data_tf, download=True)
+test_set = datasets.MNIST(root='./data/mnist', train=False, transform=data_tf, download=True)
 
 # 建立数据迭代器
 train_data = DataLoader(train_set, batch_size=batch_size, shuffle=True)
@@ -57,7 +71,7 @@ test_data = DataLoader(test_set, batch_size=batch_size)   # 默认shuffle=False
 
 # 导入模型，定义损失函数和优化方法
 # 输入图片大小是 28 x 28， 有10个分类
-model = NetWork(28*28, 300, 100, 10)
+model = Cnn()
 # print(model)   查看网络结构
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=learning_rate)
@@ -66,9 +80,8 @@ optimizer = optim.SGD(model.parameters(), lr=learning_rate)
 start = time.time()
 train_loss = 0
 for epoch in range(num_epochs):
-    print('current epoch = %d' % epoch)
+    # print('current epoch = %d' % epoch)
     for i, (train_img, label) in enumerate(train_data):
-        train_img = train_img.view(-1, 28*28)
         out = model(train_img)
         loss = criterion(out, label)
         optimizer.zero_grad()
@@ -76,8 +89,9 @@ for epoch in range(num_epochs):
         optimizer.step()
 
         train_loss += loss.item()
-        if i % 100 == 0:
-            print('current loss = %.5f' % loss.item())
+        if (i+1) % 100 == 0:
+            print('epoch: {}/{}, Iter: {}/{},Loss:{:.4f}'.format(epoch+1, num_epochs, i+1, len(train_data), loss.item()))
+            # print('current loss = %.5f' % loss.item())
 
 time_elapsed = time.time() - start
 print('Training complete in {:.0f}s'.format(time_elapsed % 60))
@@ -89,7 +103,6 @@ eval_acc = 0
 total = 0
 # with torch.no_grad():
 for test_img, label in test_data:
-    test_img = test_img.view(-1, 28*28)
     out = model(test_img)
     loss = criterion(out, label)
 
@@ -100,9 +113,3 @@ for test_img, label in test_data:
     eval_acc += num_correct
 
 print('Accuracy of the network on test images: %d %%' % (100 * eval_acc / total))
-
-
-
-
-
-
